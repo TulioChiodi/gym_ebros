@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Exercise, Workout, WorkoutExercise
+from .models import Exercise, Workout, WorkoutExercise, WorkoutSession, ExercisePerformance
 
 @admin.register(Exercise)
 class ExerciseAdmin(admin.ModelAdmin):
@@ -15,6 +15,18 @@ class WorkoutAdmin(admin.ModelAdmin):
 
 @admin.register(WorkoutExercise)
 class WorkoutExerciseAdmin(admin.ModelAdmin):
-    list_display = ('workout', 'exercise', 'sets', 'reps', 'weight', 'order')
+    list_display = ('workout', 'exercise', 'suggested_sets', 'suggested_reps', 'order')
     search_fields = ('workout__name', 'exercise__name')
     list_filter = ('workout', 'exercise')
+
+@admin.register(WorkoutSession)
+class WorkoutSessionAdmin(admin.ModelAdmin):
+    list_display = ('workout', 'user', 'started_at', 'finished_at')
+    search_fields = ('workout__name', 'user__username')
+    list_filter = ('user', 'started_at')
+
+@admin.register(ExercisePerformance)
+class ExercisePerformanceAdmin(admin.ModelAdmin):
+    list_display = ('workout_session', 'exercise', 'set_number', 'reps', 'weight')
+    search_fields = ('workout_session__workout__name', 'exercise__name')
+    list_filter = ('workout_session__user', 'exercise')

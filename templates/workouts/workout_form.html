@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+    {% if form.instance.pk %}
+        Edit Workout - {{ form.instance.name }}
+    {% else %}
+        Create New Workout
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-md-10 offset-md-1">
+            <div class="card">
+                <div class="card-body">
+                    <h2 class="card-title text-center mb-4">
+                        {% if form.instance.pk %}
+                            Edit Workout
+                        {% else %}
+                            Create New Workout
+                        {% endif %}
+                    </h2>
+                    
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in form.non_field_errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.name.id_for_label }}" class="form-label">{{ form.name.label }}</label>
+                                    {{ form.name }}
+                                    {% if form.name.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.name.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.description.id_for_label }}" class="form-label">{{ form.description.label }}</label>
+                                    {{ form.description }}
+                                    {% if form.description.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.description.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <h3 class="mb-3">Exercises</h3>
+                        {{ exercises.management_form }}
+                        <div id="exercise-formset">
+                            {% for exercise_form in exercises.forms %}
+                                <div class="exercise-form card mb-3">
+                                    <div class="card-body">
+                                        <div class="row">
+                                            {% for hidden in exercise_form.hidden_fields %}
+                                                {{ hidden }}
+                                            {% endfor %}
+                                            <div class="col-md-4">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Exercise</label>
+                                                    {{ exercise_form.exercise }}
+                                                </div>
+                                            </div>
+                                            <div class="col-md-2">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Sets</label>
+                                                    {{ exercise_form.sets }}
+                                                </div>
+                                            </div>
+                                            <div class="col-md-2">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Reps</label>
+                                                    {{ exercise_form.reps }}
+                                                </div>
+                                            </div>
+                                            <div class="col-md-2">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Weight (kg)</label>
+                                                    {{ exercise_form.weight }}
+                                                </div>
+                                            </div>
+                                            <div class="col-md-12">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Notes</label>
+                                                    {{ exercise_form.notes }}
+                                                </div>
+                                            </div>
+                                            {% if exercise_form.instance.pk %}
+                                                <div class="col-12">
+                                                    <div class="form-check">
+                                                        {{ exercise_form.DELETE }}
+                                                        <label class="form-check-label text-danger" for="{{ exercise_form.DELETE.id_for_label }}">
+                                                            Delete this exercise
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="mb-4">
+                            <button type="button" id="add-exercise" class="btn btn-outline-primary">
+                                Add Another Exercise
+                            </button>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'workouts:workout_list' %}" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                {% if form.instance.pk %}
+                                    Update Workout
+                                {% else %}
+                                    Create Workout
+                                {% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const addExerciseBtn = document.getElementById('add-exercise');
+    const exerciseFormset = document.getElementById('exercise-formset');
+    const totalFormsInput = document.getElementById('id_workoutexercise_set-TOTAL_FORMS');
+    
+    addExerciseBtn.addEventListener('click', function() {
+        const forms = exerciseFormset.getElementsByClassName('exercise-form');
+        const formCount = forms.length;
+        const newForm = forms[0].cloneNode(true);
+        
+        // Update form index
+        newForm.innerHTML = newForm.innerHTML.replace(/-0-/g, `-${formCount}-`);
+        
+        // Clear input values
+        newForm.querySelectorAll('input:not([type=hidden]), select, textarea').forEach(input => {
+            input.value = '';
+        });
+        
+        exerciseFormset.appendChild(newForm);
+        totalFormsInput.value = formCount + 1;
+    });
+});
+</script>
+{% endblock %} 

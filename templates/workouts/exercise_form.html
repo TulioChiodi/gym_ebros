@@ -1,14 +1,26 @@
 {% extends 'base.html' %}
 
-{% block title %}Login - Gym Ebros{% endblock %}
+{% block title %}
+    {% if form.instance.pk %}
+        Edit Exercise - {{ form.instance.name }}
+    {% else %}
+        Add New Exercise
+    {% endif %}
+{% endblock %}
 
 {% block content %}
 <div class="container py-5">
     <div class="row">
-        <div class="col-md-6 offset-md-3">
+        <div class="col-md-8 offset-md-2">
             <div class="card">
                 <div class="card-body">
-                    <h2 class="card-title text-center mb-4">Login</h2>
+                    <h2 class="card-title text-center mb-4">
+                        {% if form.instance.pk %}
+                            Edit Exercise
+                        {% else %}
+                            Add New Exercise
+                        {% endif %}
+                    </h2>
                     
                     <form method="post" novalidate>
                         {% csrf_token %}
@@ -24,30 +36,31 @@
                         {% for field in form %}
                             <div class="mb-3">
                                 <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-                                <input type="{{ field.field.widget.input_type }}"
-                                       name="{{ field.name }}"
-                                       id="{{ field.id_for_label }}"
-                                       class="form-control {% if field.errors %}is-invalid{% endif %}"
-                                       {% if field.value %}value="{{ field.value }}"{% endif %}
-                                       required>
+                                {{ field }}
                                 {% if field.errors %}
-                                    <div class="invalid-feedback">
+                                    <div class="invalid-feedback d-block">
                                         {% for error in field.errors %}
                                             {{ error }}
                                         {% endfor %}
                                     </div>
                                 {% endif %}
+                                {% if field.help_text %}
+                                    <small class="form-text text-muted">{{ field.help_text }}</small>
+                                {% endif %}
                             </div>
                         {% endfor %}
                         
-                        <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary">Login</button>
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'workouts:exercise_list' %}" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                {% if form.instance.pk %}
+                                    Update Exercise
+                                {% else %}
+                                    Add Exercise
+                                {% endif %}
+                            </button>
                         </div>
                     </form>
-                    
-                    <div class="text-center mt-3">
-                        <p>Don't have an account? <a href="{% url 'accounts:signup' %}">Sign up</a></p>
-                    </div>
                 </div>
             </div>
         </div>

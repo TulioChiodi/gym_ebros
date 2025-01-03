@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ workout.name }} - Gym Ebros{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h1 class="card-title mb-0">{{ workout.name }}</h1>
+                        <div class="btn-group">
+                            <a href="{% url 'workouts:workout_edit' workout.pk %}" class="btn btn-primary">Edit Workout</a>
+                            <a href="{% url 'workouts:workout_delete' workout.pk %}" class="btn btn-danger">Delete</a>
+                        </div>
+                    </div>
+
+                    {% if workout.description %}
+                        <p class="card-text mb-4">{{ workout.description }}</p>
+                    {% endif %}
+
+                    <h3>Exercises</h3>
+                    {% if workout.workoutexercise_set.exists %}
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Exercise</th>
+                                        <th>Sets</th>
+                                        <th>Reps</th>
+                                        <th>Weight</th>
+                                        <th>Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for exercise in workout.workoutexercise_set.all %}
+                                        <tr>
+                                            <td>{{ exercise.exercise.name }}</td>
+                                            <td>{{ exercise.sets }}</td>
+                                            <td>{{ exercise.reps }}</td>
+                                            <td>{% if exercise.weight %}{{ exercise.weight }} kg{% else %}-{% endif %}</td>
+                                            <td>{{ exercise.notes|default:"-" }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No exercises added to this workout yet.</p>
+                    {% endif %}
+
+                    <div class="mt-4">
+                        <a href="{% url 'workouts:workout_list' %}" class="btn btn-secondary">Back to Workouts</a>
+                    </div>
+                </div>
+                <div class="card-footer text-muted">
+                    Created: {{ workout.created_at|date }}
+                    {% if workout.updated_at != workout.created_at %}
+                        | Last modified: {{ workout.updated_at|date }}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

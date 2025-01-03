@@ -4,28 +4,38 @@ from django.contrib.auth.forms import UserCreationForm
 from django.urls import reverse_lazy
 from django.views.generic import CreateView
 from django.contrib.auth.views import LoginView, LogoutView
+from django.contrib import messages
 
 class SignUpView(CreateView):
     form_class = UserCreationForm
     template_name = 'accounts/signup.html'
-    success_url = reverse_lazy('accounts:login')
+    
+    def get_success_url(self):
+        return reverse_lazy('workouts:index')
 
     def form_valid(self, form):
-        response = super().form_valid(form)
-        # Automatically log in the user after registration
-        user = authenticate(
-            username=form.cleaned_data['username'],
-            password=form.cleaned_data['password1']
-        )
-        if user is not None:
-            login(self.request, user)
-            return redirect('workouts:index')
-        return response
+        # Save the user first
+        user = form.save()
+        # Log the user in
+        login(self.request, user)
+        messages.success(self.request, 'Account created successfully!')
+        return redirect(self.get_success_url())
 
 class CustomLoginView(LoginView):
     template_name = 'accounts/login.html'
     redirect_authenticated_user = True
-    next_page = reverse_lazy('workouts:index')
+    
+    def get_success_url(self):
+        return reverse_lazy('workouts:index')
+    
+    def form_valid(self, form):
+        messages.success(self.request, 'Logged in successfully!')
+        return super().form_valid(form)
 
 class CustomLogoutView(LogoutView):
     next_page = 'workouts:index'
+    
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            messages.info(request, 'You have been logged out.')
+        return super().dispatch(request, *args, **kwargs)

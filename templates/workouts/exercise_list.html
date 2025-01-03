@@ -6,7 +6,7 @@
 <div class="container py-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>Exercises</h1>
-        <a href="#" class="btn btn-primary">Add Exercise</a>
+        <a href="{% url 'workouts:exercise_create' %}" class="btn btn-primary">Add Exercise</a>
     </div>
 
     {% if exercises %}
@@ -20,7 +20,13 @@
                             <p class="card-text">{{ exercise.description|truncatewords:30 }}</p>
                         </div>
                         <div class="card-footer bg-transparent">
-                            <small class="text-muted">Added {{ exercise.created_at|date }}</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">Added {{ exercise.created_at|date }}</small>
+                                <div class="btn-group">
+                                    <a href="{% url 'workouts:exercise_edit' exercise.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                                    <a href="{% url 'workouts:exercise_delete' exercise.pk %}" class="btn btn-sm btn-outline-danger">Delete</a>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
