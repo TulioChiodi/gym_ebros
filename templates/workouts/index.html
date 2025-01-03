@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block title %}Gym Ebros - Home{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-md-6 offset-md-3 text-center">
+            <h1 class="display-4 mb-4">Welcome to Gym Ebros</h1>
+            <p class="lead">Track your workouts and progress with ease.</p>
+        </div>
+    </div>
+
+    <div class="row mt-5">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Exercises</h5>
+                    <p class="card-text">Total exercises available: {{ total_exercises }}</p>
+                    <a href="{% url 'workouts:exercise_list' %}" class="btn btn-primary">View Exercises</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Workouts</h5>
+                    <p class="card-text">Total workouts created: {{ total_workouts }}</p>
+                    <a href="#" class="btn btn-primary">View Workouts</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
