@@ -3,32 +3,88 @@
 {% block title %}Gym Ebros - Home{% endblock %}
 
 {% block content %}
-<div class="container py-5">
+<div class="container mt-4">
     <div class="row">
-        <div class="col-md-6 offset-md-3 text-center">
-            <h1 class="display-4 mb-4">Welcome to Gym Ebros</h1>
-            <p class="lead">Track your workouts and progress with ease.</p>
-        </div>
-    </div>
+        <div class="col-md-8 offset-md-2">
+            <div class="text-center mb-5">
+                <h1 class="display-4">Welcome to Gym Ebros</h1>
+                <p class="lead">Track your workouts and progress with ease</p>
+            </div>
 
-    <div class="row mt-5">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Exercises</h5>
-                    <p class="card-text">Total exercises available: {{ total_exercises }}</p>
-                    <a href="{% url 'workouts:exercise_list' %}" class="btn btn-primary">View Exercises</a>
+            {% if user.is_authenticated %}
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">Quick Start</h5>
+                                <p class="card-text">Ready to work out? Start a new session now!</p>
+                                <a href="{% url 'workouts:start_session' %}" class="btn btn-primary">
+                                    <i class="bi bi-play-circle"></i> Start Workout
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">Recent Sessions</h5>
+                                <p class="card-text">View your workout history and progress</p>
+                                <a href="{% url 'workouts:session_list' %}" class="btn btn-outline-primary">
+                                    <i class="bi bi-clock-history"></i> View Sessions
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Workouts</h5>
-                    <p class="card-text">Total workouts created: {{ total_workouts }}</p>
-                    <a href="#" class="btn btn-primary">View Workouts</a>
+
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Exercises</h5>
+                                <p class="card-text">{{ total_exercises }} exercises available</p>
+                                <a href="{% url 'workouts:exercise_list' %}" class="btn btn-outline-primary">
+                                    <i class="bi bi-list-check"></i> View Exercises
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Workouts</h5>
+                                <p class="card-text">{{ total_workouts }} workouts created</p>
+                                <a href="{% url 'workouts:workout_list' %}" class="btn btn-outline-primary">
+                                    <i class="bi bi-calendar-check"></i> View Workouts
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Create Workout</h5>
+                                <p class="card-text">Design a new workout routine</p>
+                                <a href="{% url 'workouts:workout_create' %}" class="btn btn-outline-primary">
+                                    <i class="bi bi-plus-circle"></i> Create Workout
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            {% else %}
+                <div class="text-center">
+                    <p class="lead mb-4">Please log in or sign up to start tracking your workouts</p>
+                    <div class="d-grid gap-2 col-md-6 mx-auto">
+                        <a href="{% url 'accounts:login' %}" class="btn btn-primary">
+                            <i class="bi bi-box-arrow-in-right"></i> Login
+                        </a>
+                        <a href="{% url 'accounts:signup' %}" class="btn btn-outline-primary">
+                            <i class="bi bi-person-plus"></i> Sign Up
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
         </div>
     </div>
 </div>

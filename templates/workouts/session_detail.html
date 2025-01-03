@@ -1,87 +1,120 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ session.workout.name }} Session - Gym Ebros{% endblock %}
-
 {% block content %}
-<div class="container py-5">
+<div class="container mt-4">
     <div class="row">
-        <div class="col-md-8">
-            <!-- Workout Information -->
+        <!-- Workout Info -->
+        <div class="col-md-4">
             <div class="card mb-4">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">{{ session.workout.name }}</h3>
+                </div>
                 <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h1 class="card-title mb-0">{{ session.workout.name }}</h1>
-                        {% if not session.finished_at %}
-                            <form method="post" style="display: inline;">
-                                {% csrf_token %}
-                                <button type="submit" name="finish_workout" class="btn btn-success">
-                                    Finish Workout
-                                </button>
-                            </form>
-                        {% endif %}
-                    </div>
-                    {% if session.workout.description %}
-                        <p class="card-text">{{ session.workout.description }}</p>
+                    <p><strong>Started:</strong> {{ session.started_at|date:"g:i a" }}</p>
+                    {% if session.finished_at %}
+                        <p><strong>Finished:</strong> {{ session.finished_at|date:"g:i a" }}</p>
+                        <p><strong>Duration:</strong> {{ session.finished_at|timeuntil:session.started_at }}</p>
                     {% endif %}
-                    <p class="text-muted mb-0">
-                        Started: {{ session.started_at|date:"F j, Y, g:i a" }}
-                        {% if session.finished_at %}
-                            <br>Finished: {{ session.finished_at|date:"F j, Y, g:i a" }}
-                        {% endif %}
-                    </p>
+                    {% if session.notes %}
+                        <p><strong>Notes:</strong> {{ session.notes }}</p>
+                    {% endif %}
+                    
+                    {% if not session.finished_at %}
+                        <form method="post" class="mt-3">
+                            {% csrf_token %}
+                            <input type="hidden" name="finish_workout" value="1">
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="bi bi-check-circle"></i> Finish Workout
+                            </button>
+                        </form>
+                    {% endif %}
                 </div>
             </div>
 
-            <!-- Exercise List -->
+            <!-- Rest Timer -->
             <div class="card mb-4">
                 <div class="card-header">
-                    <h3 class="mb-0">Exercises</h3>
+                    <h5 class="card-title mb-0">Rest Timer</h5>
                 </div>
                 <div class="card-body">
-                    {% if workout_exercises %}
-                        <div class="list-group">
-                            {% for workout_exercise in workout_exercises %}
-                                <div class="list-group-item">
-                                    <h5 class="mb-1">{{ workout_exercise.exercise.name }}</h5>
-                                    <p class="mb-1">Target: {{ workout_exercise.exercise.target_muscle }}</p>
-                                    <p class="mb-1">Suggested: {{ workout_exercise.suggested_sets }} sets × {{ workout_exercise.suggested_reps }} reps</p>
-                                    {% if workout_exercise.notes %}
-                                        <p class="mb-0"><small class="text-muted">{{ workout_exercise.notes }}</small></p>
-                                    {% endif %}
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p class="text-muted">No exercises in this workout.</p>
-                    {% endif %}
+                    <div class="text-center mb-3">
+                        <h2 id="timer" class="display-4">00:00</h2>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary" onclick="startTimer(60)">1 min</button>
+                        <button class="btn btn-primary" onclick="startTimer(90)">1.5 min</button>
+                        <button class="btn btn-primary" onclick="startTimer(120)">2 min</button>
+                        <button class="btn btn-primary" onclick="startTimer(180)">3 min</button>
+                        <button class="btn btn-secondary" onclick="stopTimer()">Stop</button>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-md-4">
-            <!-- Performance Tracking -->
+        <!-- Exercise Tracking -->
+        <div class="col-md-8">
             {% if not session.finished_at %}
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h3 class="mb-0">Track Set</h3>
+                        <h5 class="card-title mb-0">Record Set</h5>
                     </div>
                     <div class="card-body">
-                        <form method="post" novalidate>
+                        <form method="post">
                             {% csrf_token %}
-                            {% for field in form %}
-                                <div class="mb-3">
-                                    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-                                    {{ field }}
-                                    {% if field.errors %}
-                                        <div class="invalid-feedback d-block">
-                                            {% for error in field.errors %}
-                                                {{ error }}
-                                            {% endfor %}
-                                        </div>
+                            
+                            {% if form.non_field_errors %}
+                                <div class="alert alert-danger">
+                                    {% for error in form.non_field_errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.exercise.id_for_label }}" class="form-label">Exercise</label>
+                                    {{ form.exercise }}
+                                    {% if form.exercise.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.exercise.errors }}</div>
                                     {% endif %}
                                 </div>
-                            {% endfor %}
-                            <button type="submit" class="btn btn-primary w-100">Record Set</button>
+                                
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.weight.id_for_label }}" class="form-label">Weight (kg)</label>
+                                    {{ form.weight }}
+                                    {% if form.weight.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.weight.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.reps.id_for_label }}" class="form-label">Reps</label>
+                                    {{ form.reps }}
+                                    {% if form.reps.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.reps.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.rpe.id_for_label }}" class="form-label">RPE (Optional)</label>
+                                    {{ form.rpe }}
+                                    {% if form.rpe.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.rpe.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="{{ form.notes.id_for_label }}" class="form-label">Notes (Optional)</label>
+                                {{ form.notes }}
+                                {% if form.notes.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.notes.errors }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> Record Set
+                            </button>
                         </form>
                     </div>
                 </div>
@@ -90,35 +123,96 @@
             <!-- Performance History -->
             <div class="card">
                 <div class="card-header">
-                    <h3 class="mb-0">Sets Completed</h3>
+                    <h5 class="card-title mb-0">Session Progress</h5>
                 </div>
                 <div class="card-body">
                     {% if performances %}
-                        <div class="list-group">
-                            {% for performance in performances %}
-                                <div class="list-group-item">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <h6 class="mb-1">{{ performance.exercise.name }}</h6>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Exercise</th>
+                                        <th>Set</th>
+                                        <th>Weight</th>
+                                        <th>Reps</th>
+                                        <th>RPE</th>
+                                        <th>Notes</th>
                                         {% if not session.finished_at %}
-                                            <form method="post" action="{% url 'workouts:delete_performance' session.pk performance.pk %}" style="display: inline;">
-                                                {% csrf_token %}
-                                                <button type="submit" class="btn btn-sm btn-danger">×</button>
-                                            </form>
+                                            <th>Actions</th>
                                         {% endif %}
-                                    </div>
-                                    <p class="mb-1">Set {{ performance.set_number }}: {{ performance.reps }} reps @ {{ performance.weight }}kg</p>
-                                    {% if performance.notes %}
-                                        <small class="text-muted">{{ performance.notes }}</small>
-                                    {% endif %}
-                                </div>
-                            {% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for performance in performances %}
+                                        <tr>
+                                            <td>{{ performance.exercise.name }}</td>
+                                            <td>{{ performance.set_number }}</td>
+                                            <td>{{ performance.weight }} kg</td>
+                                            <td>{{ performance.reps }}</td>
+                                            <td>{{ performance.rpe|default:"-" }}</td>
+                                            <td>{{ performance.notes|default:"-" }}</td>
+                                            {% if not session.finished_at %}
+                                                <td>
+                                                    <form method="post" action="{% url 'workouts:delete_performance' session.pk performance.pk %}" class="d-inline">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this set?')">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            {% endif %}
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
                         </div>
                     {% else %}
-                        <p class="text-muted">No sets recorded yet.</p>
+                        <p class="text-muted mb-0">No sets recorded yet.</p>
                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+{% block extra_js %}
+<script>
+let timerInterval;
+let endTime;
+const timerDisplay = document.getElementById('timer');
+const timerSound = new Audio('data:audio/wav;base64,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qJrx4KOQjahZxWbcZgztj2c49nKmkId44S71j0c8eV9yDK6uPRzx5X18eDvjvQ6yKo9ZSS6l//8elePK/Lf//IInrOF/FvDoADYAGBMGb7FtErm5MXMlmPAJQVgWta7Zx2go+8xJ0UiCb8LHHdftWyLJE0QIAIsI+UbXu67dZMjmgDGCGl1H+vpF4NSDckSIkk7Vd+sxEhBQMRU8j/12UIRhzSaUdQ+rQU5kGeFxm+hb1oh6pWWmv3uvmReDl0UnvtapVaIzo1jZbf/pD6ElLqSX+rUmOQNpJFa/r+sa4e/pBlAABoAAAAA3CUgShLdGIxsY7AUABPRrgCABdDuQ5GC7DqPQCgbbJUAoRSUj+NIEig0YfyWUho1VBBBA//uQZB4ABZx5zfMakeAAAAmwAAAAF5F3P0w9GtAAACfAAAAAwLhMDmAYWMgVEG1U0FIGCBgXBXAtfMH10000EEEEEECUBYln03TTTdNBDZopopYvrTTdNa325mImNg3TTPV9q3pmY0xoO6bv3r00y+IDGid/9aaaZTGMuj9mpu9Mpio1dXrr5HERTZSmqU36A3CumzN/9Robv/Xx4v9ijkSRSNLQhAWumap82WRSBUqXStV/YcS+XVLnSS+WLDroqArFkMEsAS+eWmrUzrO0oEmE40RlMZ5+ODIkAyKAGUwZ3mVKmcamcJnMW26MRPgUw6j+LkhyHGVGYjSUUKNpuJUQoOIAyDvEyG8S5yfK6dhZc0Tx1KI/gviKL6qvvFs1+bWtaz58uUNnryq6kt5RzOCkPWlVqVX2a/EEBUdU1KrXLf40GoiiFXK///qpoiDXrOgqDR38JB0bw7SoL+ZB9o1RCkQjQ2CBYZKd/+VJxZRRZlqSkKiws0WFxUyCwsKiMy7hUVFhIaCrNQsKkTIsLivwKKigsj8XYlwt/WKi2N4d//uQRCSAAjURNIHpMZBGYiaQPSYyAAABLAAAAAAAACWAAAAApUF/Mg+0aohSIRobBAsMlO//Kk4soosy1JSFRYWaLC4qZBYWFRGZdwqKiwkNBVmoWFSJkWFxX4FFRQWR+LsS4W/rFRb/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////VEFHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAU291bmRib3kuZGUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMjAwNGh0dHA6Ly93d3cuc291bmRib3kuZGUAAAAAAAAAACU=');
+
+function startTimer(seconds) {
+    // Clear any existing timer
+    stopTimer();
+    
+    // Set end time
+    endTime = Date.now() + seconds * 1000;
+    
+    // Start the timer
+    timerInterval = setInterval(updateTimer, 100);
+}
+
+function stopTimer() {
+    clearInterval(timerInterval);
+    timerDisplay.textContent = '00:00';
+}
+
+function updateTimer() {
+    const now = Date.now();
+    const timeLeft = Math.max(0, endTime - now);
+    
+    if (timeLeft === 0) {
+        stopTimer();
+        timerSound.play();
+        return;
+    }
+    
+    const minutes = Math.floor(timeLeft / 60000);
+    const seconds = Math.floor((timeLeft % 60000) / 1000);
+    
+    timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}
+</script>
+{% endblock %}
 {% endblock %} 

@@ -6,11 +6,54 @@ from django.urls import reverse_lazy
 from django.contrib import messages
 from django.db import transaction
 from django.utils import timezone
+from django.http import HttpResponse
 from .models import Exercise, Workout, WorkoutExercise, WorkoutSession, ExercisePerformance
 from .forms import (
     ExerciseForm, WorkoutForm, WorkoutExerciseFormSet,
     WorkoutSessionForm, ExercisePerformanceForm, ExercisePerformanceFormSet
 )
+from django.core.exceptions import ValidationError
+import logging
+import json
+
+# Set up logger
+logger = logging.getLogger(__name__)
+
+def debug_form_data(request, form=None, formset=None):
+    """Helper function to log form data and errors"""
+    logger.debug("==== Form Debug Information ====")
+    
+    # Log request method and path
+    logger.debug(f"Request Method: {request.method}")
+    logger.debug(f"Request Path: {request.path}")
+    
+    # Log POST data
+    logger.debug("POST Data:")
+    for key, value in request.POST.items():
+        logger.debug(f"  {key}: {value}")
+    
+    # Log main form errors if exists
+    if form and hasattr(form, 'errors'):
+        logger.debug("Main Form Errors:")
+        logger.debug(json.dumps(form.errors.as_json(), indent=2))
+    
+    # Log formset data and errors if exists
+    if formset:
+        logger.debug("Formset Information:")
+        logger.debug(f"  Total Forms: {formset.total_form_count()}")
+        logger.debug(f"  Initial Forms: {formset.initial_form_count()}")
+        logger.debug(f"  Is Valid: {formset.is_valid()}")
+        
+        if not formset.is_valid():
+            logger.debug("Formset Errors:")
+            for i, form_errors in enumerate(formset.errors):
+                if form_errors:
+                    logger.debug(f"  Form {i} Errors:")
+                    logger.debug(json.dumps(form_errors, indent=2))
+            
+            if formset.non_form_errors():
+                logger.debug("Formset Non-Form Errors:")
+                logger.debug(json.dumps(formset.non_form_errors(), indent=2))
 
 class ExerciseListView(LoginRequiredMixin, ListView):
     model = Exercise
@@ -84,14 +127,33 @@ class WorkoutCreateView(LoginRequiredMixin, CreateView):
     def form_valid(self, form):
         context = self.get_context_data()
         exercises = context['exercises']
-        with transaction.atomic():
-            form.instance.user = self.request.user
-            self.object = form.save()
-            if exercises.is_valid():
-                exercises.instance = self.object
-                exercises.save()
-        messages.success(self.request, 'Workout created successfully!')
-        return super().form_valid(form)
+        
+        if not exercises.is_valid():
+            return self.form_invalid(form)
+            
+        try:
+            with transaction.atomic():
+                form.instance.user = self.request.user
+                self.object = form.save()
+                
+                if exercises.is_valid():
+                    exercises.instance = self.object
+                    exercises.save()
+                    
+                    # Check if at least one exercise was added
+                    if not self.object.workoutexercise_set.exists():
+                        raise ValidationError("Please add at least one exercise to the workout.")
+                        
+                messages.success(self.request, 'Workout created successfully!')
+                return super().form_valid(form)
+                
+        except ValidationError as e:
+            messages.error(self.request, str(e))
+            return self.form_invalid(form)
+            
+    def form_invalid(self, form):
+        messages.error(self.request, 'Please correct the errors below.')
+        return super().form_invalid(form)
 
 class WorkoutUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     model = Workout
@@ -106,22 +168,69 @@ class WorkoutUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     def get_context_data(self, **kwargs):
         data = super().get_context_data(**kwargs)
         if self.request.POST:
-            data['exercises'] = WorkoutExerciseFormSet(self.request.POST, instance=self.object)
+            # If POST data exists, create formset with POST data
+            formset = WorkoutExerciseFormSet(self.request.POST, instance=self.object)
+            # We'll handle order in form_valid after validation
         else:
-            data['exercises'] = WorkoutExerciseFormSet(instance=self.object)
+            # For GET requests, create formset with instance data
+            formset = WorkoutExerciseFormSet(instance=self.object)
+            # Set initial order for empty forms
+            for i, form in enumerate(formset.forms):
+                if not form.initial.get('order'):
+                    form.initial['order'] = i + 1
+        data['exercises'] = formset
         return data
 
     def form_valid(self, form):
         context = self.get_context_data()
         exercises = context['exercises']
-        with transaction.atomic():
-            form.instance.user = self.request.user
-            self.object = form.save()
-            if exercises.is_valid():
+        
+        # Log debugging information
+        debug_form_data(self.request, form, exercises)
+        
+        if not exercises.is_valid():
+            logger.error("Exercise formset validation failed")
+            for i, form_errors in enumerate(exercises.errors):
+                if form_errors:
+                    error_msg = f"Form {i} errors: {json.dumps(form_errors)}"
+                    logger.error(error_msg)
+                    messages.error(self.request, error_msg)
+            return self.form_invalid(form)
+            
+        try:
+            with transaction.atomic():
+                form.instance.user = self.request.user
+                self.object = form.save()
+                
+                # Set order for forms after validation
+                for i, form in enumerate(exercises.forms):
+                    if form.is_valid() and form.cleaned_data and not form.cleaned_data.get('DELETE'):
+                        form.instance.order = form.cleaned_data.get('order', i + 1)
+                
                 exercises.instance = self.object
                 exercises.save()
-        messages.success(self.request, 'Workout updated successfully!')
-        return super().form_valid(form)
+                
+                # Check if at least one exercise was added
+                if not self.object.workoutexercise_set.exists():
+                    raise ValidationError("Please add at least one exercise to the workout.")
+                    
+                messages.success(self.request, 'Workout updated successfully!')
+                return super().form_valid(form)
+                
+        except ValidationError as e:
+            logger.error(f"Validation error: {str(e)}")
+            messages.error(self.request, str(e))
+            return self.form_invalid(form)
+        except Exception as e:
+            logger.exception("Unexpected error during workout update")
+            messages.error(self.request, f"An unexpected error occurred: {str(e)}")
+            return self.form_invalid(form)
+            
+    def form_invalid(self, form):
+        logger.error("Form validation failed")
+        logger.error(f"Form errors: {json.dumps(form.errors.as_json(), indent=2)}")
+        messages.error(self.request, 'Please correct the errors below.')
+        return super().form_invalid(form)
 
 class WorkoutDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     model = Workout
@@ -175,7 +284,7 @@ class WorkoutSessionDetailView(LoginRequiredMixin, View):
         return {
             'session': session,
             'workout_exercises': session.workout.workoutexercise_set.all(),
-            'performances': session.exerciseperformance_set.all().order_by('created_at'),
+            'performances': session.exerciseperformance_set.all().order_by('performed_at'),
             'form': ExercisePerformanceForm(workout_session=session)
         }
 
@@ -190,6 +299,7 @@ class WorkoutSessionDetailView(LoginRequiredMixin, View):
             if not session.finished_at:
                 session.finished_at = timezone.now()
                 session.save()
+                messages.success(request, "Workout session completed!")
             return redirect('workouts:session_list')
 
         if session.finished_at:
@@ -200,6 +310,7 @@ class WorkoutSessionDetailView(LoginRequiredMixin, View):
         if form.is_valid():
             performance = form.save(commit=False)
             performance.workout_session = session
+            performance.performed_at = timezone.now()
             
             # Get the last set number for this exercise in this session
             last_set = ExercisePerformance.objects.filter(
@@ -229,3 +340,57 @@ class DeletePerformanceView(LoginRequiredMixin, View):
         performance.delete()
         messages.success(request, "Set deleted successfully!")
         return redirect('workouts:session_detail', pk=session_pk)
+
+@login_required
+def add_exercise_form(request):
+    """HTMX view to add a new exercise form to the formset"""
+    try:
+        form_index = int(request.GET.get('form_index', 0))
+        logger.debug(f"Adding exercise form with index: {form_index}")
+        
+        formset = WorkoutExerciseFormSet()
+        empty_form = formset.empty_form
+        
+        # Log form generation details
+        logger.debug(f"Empty form prefix before update: {empty_form.prefix}")
+        
+        # Update form index in the prefix
+        empty_form.prefix = empty_form.prefix.replace('__prefix__', str(form_index))
+        logger.debug(f"Empty form prefix after update: {empty_form.prefix}")
+        
+        # Set initial values including order
+        empty_form.initial = {
+            'order': form_index + 1,  # Set order to form_index + 1
+            'suggested_sets': 3,  # Default values
+            'suggested_reps': 10
+        }
+        logger.debug(f"Updated initial data: {empty_form.initial}")
+        
+        # Update widget attributes for each field
+        for field_name, field in empty_form.fields.items():
+            widget = field.widget
+            widget_attrs = {
+                'id': f'id_workoutexercise_set-{form_index}-{field_name}',
+                'name': f'workoutexercise_set-{form_index}-{field_name}',
+            }
+            
+            # Add any existing attributes
+            widget_attrs.update(widget.attrs)
+            
+            # For order field, make it a hidden input with the value set
+            if field_name == 'order':
+                widget.input_type = 'hidden'
+                widget_attrs['value'] = str(form_index + 1)
+            
+            widget.attrs = widget_attrs
+            logger.debug(f"Field {field_name} attributes: {widget_attrs}")
+        
+        context = {
+            'exercise_form': empty_form,
+            'form_index': form_index,
+        }
+        return render(request, 'workouts/partials/exercise_form.html', context)
+        
+    except Exception as e:
+        logger.exception("Error in add_exercise_form")
+        return HttpResponse(f"Error adding exercise form: {str(e)}", status=500)

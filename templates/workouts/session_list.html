@@ -1,42 +1,38 @@
 {% extends 'base.html' %}
 
-{% block title %}My Workout Sessions - Gym Ebros{% endblock %}
-
 {% block content %}
-<div class="container py-5">
+<div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>My Workout Sessions</h1>
-        <a href="{% url 'workouts:start_session' %}" class="btn btn-primary">Start New Session</a>
+        <h1>Workout Sessions</h1>
+        <a href="{% url 'workouts:start_session' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Start New Session
+        </a>
     </div>
 
     {% if sessions %}
-        <div class="row row-cols-1 row-cols-md-2 g-4">
+        <div class="row">
             {% for session in sessions %}
-                <div class="col">
+                <div class="col-md-6 mb-4">
                     <div class="card h-100">
                         <div class="card-body">
                             <h5 class="card-title">{{ session.workout.name }}</h5>
                             <p class="card-text">
-                                Started: {{ session.started_at|date:"F j, Y, g:i a" }}<br>
+                                <strong>Started:</strong> {{ session.started_at|date:"F j, Y, g:i a" }}<br>
                                 {% if session.finished_at %}
-                                    Finished: {{ session.finished_at|date:"F j, Y, g:i a" }}
+                                    <strong>Finished:</strong> {{ session.finished_at|date:"F j, Y, g:i a" }}<br>
+                                    <strong>Duration:</strong> {{ session.finished_at|timeuntil:session.started_at }}
                                 {% else %}
                                     <span class="badge bg-success">In Progress</span>
                                 {% endif %}
                             </p>
-                            <p class="card-text">
-                                <small class="text-muted">
-                                    {{ session.exerciseperformance_set.count }} sets performed
-                                </small>
-                            </p>
-                        </div>
-                        <div class="card-footer bg-transparent">
-                            <div class="d-flex justify-content-between align-items-center">
-                                {% if not session.finished_at %}
-                                    <a href="{% url 'workouts:session_detail' session.pk %}" class="btn btn-primary">Continue Session</a>
-                                {% else %}
-                                    <a href="{% url 'workouts:session_detail' session.pk %}" class="btn btn-secondary">View Details</a>
-                                {% endif %}
+                            <div class="mt-3">
+                                <a href="{% url 'workouts:session_detail' pk=session.pk %}" class="btn btn-outline-primary">
+                                    {% if session.finished_at %}
+                                        View Details
+                                    {% else %}
+                                        Continue Session
+                                    {% endif %}
+                                </a>
                             </div>
                         </div>
                     </div>
@@ -45,7 +41,9 @@
         </div>
     {% else %}
         <div class="alert alert-info">
-            You haven't started any workout sessions yet. Click "Start New Session" to begin tracking your workout.
+            <p class="mb-0">You haven't started any workout sessions yet. 
+                <a href="{% url 'workouts:start_session' %}" class="alert-link">Start your first session!</a>
+            </p>
         </div>
     {% endif %}
 </div>

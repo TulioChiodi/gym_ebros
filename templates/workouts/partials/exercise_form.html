@@ -1,0 +1,68 @@
+<div class="exercise-form card mb-3">
+    <div class="card-body">
+        <div class="row">
+            {% for hidden in exercise_form.hidden_fields %}
+                {% if hidden.name != 'order' %}
+                    {{ hidden }}
+                {% endif %}
+            {% endfor %}
+            <input type="hidden" 
+                   name="workoutexercise_set-{{ form_index }}-order" 
+                   id="id_workoutexercise_set-{{ form_index }}-order" 
+                   value="{{ form_index|add:"1" }}"
+                   class="exercise-order">
+            <div class="col-md-4">
+                <div class="mb-3">
+                    <label class="form-label">Exercise</label>
+                    {{ exercise_form.exercise }}
+                    {% if exercise_form.exercise.errors %}
+                        <div class="invalid-feedback d-block">
+                            {% for error in exercise_form.exercise.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="mb-3">
+                    <label class="form-label">Sets</label>
+                    {{ exercise_form.suggested_sets }}
+                    {% if exercise_form.suggested_sets.errors %}
+                        <div class="invalid-feedback d-block">
+                            {% for error in exercise_form.suggested_sets.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="mb-3">
+                    <label class="form-label">Reps</label>
+                    {{ exercise_form.suggested_reps }}
+                    {% if exercise_form.suggested_reps.errors %}
+                        <div class="invalid-feedback d-block">
+                            {% for error in exercise_form.suggested_reps.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-12">
+                <div class="mb-3">
+                    <label class="form-label">Notes</label>
+                    {{ exercise_form.notes }}
+                    {% if exercise_form.notes.errors %}
+                        <div class="invalid-feedback d-block">
+                            {% for error in exercise_form.notes.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div> 
