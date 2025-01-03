@@ -1,8 +1,8 @@
 from django.shortcuts import render, redirect
-from django.contrib.auth import login, authenticate
+from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.forms import UserCreationForm
 from django.urls import reverse_lazy
-from django.views.generic import CreateView
+from django.views.generic import CreateView, View
 from django.contrib.auth.views import LoginView, LogoutView
 from django.contrib import messages
 
@@ -32,10 +32,9 @@ class CustomLoginView(LoginView):
         messages.success(self.request, 'Logged in successfully!')
         return super().form_valid(form)
 
-class CustomLogoutView(LogoutView):
-    next_page = 'workouts:index'
-    
-    def dispatch(self, request, *args, **kwargs):
+class CustomLogoutView(View):
+    def get(self, request):
         if request.user.is_authenticated:
-            messages.info(request, 'You have been logged out.')
-        return super().dispatch(request, *args, **kwargs)
+            logout(request)
+            messages.success(request, 'You have been logged out successfully.')
+        return redirect('workouts:index')
