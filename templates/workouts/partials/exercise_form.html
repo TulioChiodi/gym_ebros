@@ -1,16 +1,17 @@
 <div class="exercise-form card mb-3">
     <div class="card-body">
+        {% if exercise_form.non_field_errors %}
+            <div class="alert alert-danger">
+                {% for error in exercise_form.non_field_errors %}
+                    {{ error }}
+                {% endfor %}
+            </div>
+        {% endif %}
+        
         <div class="row">
             {% for hidden in exercise_form.hidden_fields %}
-                {% if hidden.name != 'order' %}
-                    {{ hidden }}
-                {% endif %}
+                {{ hidden }}
             {% endfor %}
-            <input type="hidden" 
-                   name="workoutexercise_set-{{ form_index }}-order" 
-                   id="id_workoutexercise_set-{{ form_index }}-order" 
-                   value="{{ form_index|add:"1" }}"
-                   class="exercise-order">
             <div class="col-md-4">
                 <div class="mb-3">
                     <label class="form-label">Exercise</label>
@@ -50,7 +51,7 @@
                     {% endif %}
                 </div>
             </div>
-            <div class="col-md-12">
+            <div class="col-md-4">
                 <div class="mb-3">
                     <label class="form-label">Notes</label>
                     {{ exercise_form.notes }}

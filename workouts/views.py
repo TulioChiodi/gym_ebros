@@ -134,13 +134,26 @@ class WorkoutCreateView(LoginRequiredMixin, CreateView):
             data['exercises'] = WorkoutExerciseFormSet(self.request.POST)
         else:
             data['exercises'] = WorkoutExerciseFormSet()
+            # Set initial order for empty forms
+            for i, form in enumerate(data['exercises'].forms):
+                if not form.initial.get('order'):
+                    form.initial['order'] = i + 1
         return data
 
     def form_valid(self, form):
         context = self.get_context_data()
         exercises = context['exercises']
         
+        # Log debugging information
+        debug_form_data(self.request, form, exercises)
+        
         if not exercises.is_valid():
+            logger.error("Exercise formset validation failed")
+            for i, form_errors in enumerate(exercises.errors):
+                if form_errors:
+                    error_msg = f"Form {i} errors: {json.dumps(form_errors)}"
+                    logger.error(error_msg)
+                    messages.error(self.request, error_msg)
             return self.form_invalid(form)
             
         try:
@@ -149,6 +162,11 @@ class WorkoutCreateView(LoginRequiredMixin, CreateView):
                 self.object = form.save()
                 
                 if exercises.is_valid():
+                    # Set order for forms after validation
+                    for i, form in enumerate(exercises.forms):
+                        if form.is_valid() and form.cleaned_data and not form.cleaned_data.get('DELETE'):
+                            form.instance.order = form.cleaned_data.get('order', i + 1)
+                    
                     exercises.instance = self.object
                     exercises.save()
                     
@@ -160,10 +178,17 @@ class WorkoutCreateView(LoginRequiredMixin, CreateView):
                 return super().form_valid(form)
                 
         except ValidationError as e:
+            logger.error(f"Validation error: {str(e)}")
             messages.error(self.request, str(e))
+            return self.form_invalid(form)
+        except Exception as e:
+            logger.exception("Unexpected error during workout creation")
+            messages.error(self.request, f"An unexpected error occurred: {str(e)}")
             return self.form_invalid(form)
             
     def form_invalid(self, form):
+        logger.error("Form validation failed")
+        logger.error(f"Form errors: {json.dumps(form.errors.as_json(), indent=2)}")
         messages.error(self.request, 'Please correct the errors below.')
         return super().form_invalid(form)
 

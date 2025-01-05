@@ -30,18 +30,46 @@ class WorkoutExerciseForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not self.instance.pk and not self.data:  # Only for new instances
+        # Make exercise field required
+        self.fields['exercise'].required = True
+        self.fields['suggested_sets'].required = True
+        self.fields['suggested_reps'].required = True
+        
+        # Set initial values for new forms
+        if not self.instance.pk and not self.data:
+            self.fields['suggested_sets'].initial = 3
+            self.fields['suggested_reps'].initial = 10
+            
             try:
                 if hasattr(self.instance, 'workout') and self.instance.workout:
                     # Get the current max order value
                     max_order = WorkoutExercise.objects.filter(
                         workout=self.instance.workout
                     ).aggregate(models.Max('order'))['order__max']
-                    # Set the order to max + 1 (or 0 if no exercises exist)
+                    # Set the order to max + 1 (or 1 if no exercises exist)
                     self.initial['order'] = (max_order or 0) + 1
+                else:
+                    # If there's no workout yet, get the form index from prefix
+                    prefix = self.prefix or ''
+                    try:
+                        index = int(prefix.split('-')[1]) if '-' in prefix else 0
+                        self.initial['order'] = index + 1
+                    except (IndexError, ValueError):
+                        self.initial['order'] = 1
             except (AttributeError, WorkoutExercise.workout.RelatedObjectDoesNotExist):
-                # If there's no workout yet, just set order to 1
                 self.initial['order'] = 1
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not cleaned_data.get('order'):
+            # If order is not set, try to get it from the form prefix
+            prefix = self.prefix or ''
+            try:
+                index = int(prefix.split('-')[1]) if '-' in prefix else 0
+                cleaned_data['order'] = index + 1
+            except (IndexError, ValueError):
+                cleaned_data['order'] = 1
+        return cleaned_data
 
 class WorkoutSessionForm(forms.ModelForm):
     class Meta:
