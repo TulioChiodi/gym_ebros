@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+
+{% block title %}Shared Workouts{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <h1 class="mb-4">Shared Workouts</h1>
+
+    <!-- Workouts shared with me -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h2 class="h5 mb-0">Workouts Shared with Me</h2>
+        </div>
+        <div class="card-body">
+            {% if received_workouts %}
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Workout</th>
+                                <th>Shared By</th>
+                                <th>Shared On</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for shared in received_workouts %}
+                                <tr>
+                                    <td>
+                                        {% if shared.is_accepted %}
+                                            <a href="{% url 'workouts:workout_detail' shared.workout.pk %}">
+                                                {{ shared.workout.name }}
+                                            </a>
+                                        {% else %}
+                                            {{ shared.workout.name }}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ shared.shared_by.email }}</td>
+                                    <td>{{ shared.shared_at|date }}</td>
+                                    <td>
+                                        {% if shared.is_accepted %}
+                                            <span class="badge bg-success">Accepted</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if not shared.is_accepted %}
+                                            <form method="post" action="{% url 'workouts:accept_shared_workout' shared.pk %}" class="d-inline">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm btn-success">Accept</button>
+                                            </form>
+                                            <form method="post" action="{% url 'workouts:decline_shared_workout' shared.pk %}" class="d-inline">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm btn-danger">Decline</button>
+                                            </form>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">No workouts have been shared with you yet.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Workouts I've shared -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="h5 mb-0">Workouts I've Shared</h2>
+        </div>
+        <div class="card-body">
+            {% if shared_by_me %}
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Workout</th>
+                                <th>Shared With</th>
+                                <th>Shared On</th>
+                                <th>Status</th>
+                                <th>Permissions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for shared in shared_by_me %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'workouts:workout_detail' shared.workout.pk %}">
+                                            {{ shared.workout.name }}
+                                        </a>
+                                    </td>
+                                    <td>{{ shared.shared_with.email }}</td>
+                                    <td>{{ shared.shared_at|date }}</td>
+                                    <td>
+                                        {% if shared.is_accepted %}
+                                            <span class="badge bg-success">Accepted</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if shared.can_edit %}
+                                            <span class="badge bg-info">Can Edit</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">View Only</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">You haven't shared any workouts yet.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

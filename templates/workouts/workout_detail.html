@@ -12,6 +12,9 @@
                         <h1 class="card-title mb-0">{{ workout.name }}</h1>
                         <div class="btn-group">
                             <a href="{% url 'workouts:workout_update' workout.pk %}" class="btn btn-primary">Edit Workout</a>
+                            <a href="{% url 'workouts:share_workout' workout.pk %}" class="btn btn-info">
+                                <i class="bi bi-share"></i> Share
+                            </a>
                             <a href="{% url 'workouts:workout_delete' workout.pk %}" class="btn btn-danger">Delete</a>
                         </div>
                     </div>

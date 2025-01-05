@@ -1,19 +1,25 @@
 from django import forms
-from .models import Exercise, Workout, WorkoutExercise, WorkoutSession, ExercisePerformance
+from django.contrib.auth.models import User
 from django.db import models
+from .models import Exercise, Workout, WorkoutExercise, WorkoutSession, ExercisePerformance, SharedWorkout
 
 class ExerciseForm(forms.ModelForm):
     class Meta:
         model = Exercise
         fields = ['name', 'description']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
 
 class WorkoutForm(forms.ModelForm):
     class Meta:
         model = Workout
-        fields = ['name', 'description']
+        fields = ['name', 'description', 'is_public']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'is_public': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
 class WorkoutExerciseForm(forms.ModelForm):
@@ -100,6 +106,30 @@ class ExercisePerformanceForm(forms.ModelForm):
                 workoutexercise__workout=workout_session.workout
             ).distinct().order_by('workoutexercise__order')
         self.fields['notes'].required = False
+
+class WorkoutShareForm(forms.ModelForm):
+    email = forms.EmailField(
+        help_text="Enter the email of the user you want to share this workout with",
+        widget=forms.EmailInput(attrs={'class': 'form-control'})
+    )
+    can_edit = forms.BooleanField(
+        required=False,
+        initial=False,
+        help_text="Allow the user to edit this workout",
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+    )
+
+    class Meta:
+        model = SharedWorkout
+        fields = ['can_edit']
+
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        try:
+            User.objects.get(email=email)
+        except User.DoesNotExist:
+            raise forms.ValidationError("No user found with this email address")
+        return email
 
 WorkoutExerciseFormSet = forms.inlineformset_factory(
     Workout, WorkoutExercise,

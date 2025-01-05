@@ -9,10 +9,11 @@ from django.utils import timezone
 from django.http import HttpResponse, JsonResponse
 from django.db.models import Max, Avg, Count, F, ExpressionWrapper, FloatField, Q
 from django.db.models.functions import ExtractWeek, ExtractYear
-from .models import Exercise, Workout, WorkoutExercise, WorkoutSession, ExercisePerformance
+from .models import Exercise, Workout, WorkoutExercise, WorkoutSession, ExercisePerformance, SharedWorkout
 from .forms import (
     ExerciseForm, WorkoutForm, WorkoutExerciseFormSet,
-    WorkoutSessionForm, ExercisePerformanceForm, ExercisePerformanceFormSet
+    WorkoutSessionForm, ExercisePerformanceForm, ExercisePerformanceFormSet,
+    WorkoutShareForm
 )
 from django.core.exceptions import ValidationError
 import logging
@@ -21,6 +22,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import timedelta
+from django.contrib.auth.models import User
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -642,3 +644,71 @@ def workout_analysis(request):
     }
     
     return render(request, 'workouts/analysis.html', context)
+
+@login_required
+def share_workout(request, pk):
+    workout = get_object_or_404(Workout, pk=pk, user=request.user)
+    
+    if request.method == 'POST':
+        form = WorkoutShareForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            shared_with = User.objects.get(email=email)
+            
+            # Check if workout is already shared with this user
+            shared_workout, created = SharedWorkout.objects.get_or_create(
+                workout=workout,
+                shared_by=request.user,
+                shared_with=shared_with,
+                defaults={
+                    'can_edit': form.cleaned_data['can_edit']
+                }
+            )
+            
+            if created:
+                messages.success(request, f'Workout shared with {shared_with.email}')
+            else:
+                messages.info(request, f'Workout was already shared with {shared_with.email}')
+            
+            return redirect('workouts:workout_detail', pk=workout.pk)
+    else:
+        form = WorkoutShareForm()
+    
+    return render(request, 'workouts/share_workout.html', {
+        'form': form,
+        'workout': workout
+    })
+
+@login_required
+def shared_workouts(request):
+    # Workouts shared with the current user
+    received_workouts = SharedWorkout.objects.filter(
+        shared_with=request.user
+    ).select_related('workout', 'shared_by')
+    
+    # Workouts shared by the current user
+    shared_by_me = SharedWorkout.objects.filter(
+        shared_by=request.user
+    ).select_related('workout', 'shared_with')
+    
+    return render(request, 'workouts/shared_workouts.html', {
+        'received_workouts': received_workouts,
+        'shared_by_me': shared_by_me
+    })
+
+@login_required
+def accept_shared_workout(request, pk):
+    shared_workout = get_object_or_404(SharedWorkout, pk=pk, shared_with=request.user)
+    if not shared_workout.is_accepted:
+        shared_workout.is_accepted = True
+        shared_workout.accepted_at = timezone.now()
+        shared_workout.save()
+        messages.success(request, f'You have accepted the workout "{shared_workout.workout.name}"')
+    return redirect('workouts:shared_workouts')
+
+@login_required
+def decline_shared_workout(request, pk):
+    shared_workout = get_object_or_404(SharedWorkout, pk=pk, shared_with=request.user)
+    shared_workout.delete()
+    messages.success(request, f'You have declined the workout "{shared_workout.workout.name}"')
+    return redirect('workouts:shared_workouts')

@@ -16,9 +16,26 @@ class Workout(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    is_public = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.name} - {self.user.username}"
+
+class SharedWorkout(models.Model):
+    """Model to track workout sharing between users"""
+    workout = models.ForeignKey(Workout, on_delete=models.CASCADE)
+    shared_by = models.ForeignKey(User, related_name='shared_workouts', on_delete=models.CASCADE)
+    shared_with = models.ForeignKey(User, related_name='received_workouts', on_delete=models.CASCADE)
+    shared_at = models.DateTimeField(auto_now_add=True)
+    can_edit = models.BooleanField(default=False)
+    is_accepted = models.BooleanField(default=False)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ['workout', 'shared_by', 'shared_with']
+
+    def __str__(self):
+        return f"{self.workout.name} shared by {self.shared_by.username} with {self.shared_with.username}"
 
 class WorkoutExercise(models.Model):
     """Exercise template within a workout"""
