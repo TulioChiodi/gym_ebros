@@ -13,18 +13,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveField(
-            model_name='exercise',
-            name='target_muscle',
-        ),
-        migrations.RemoveField(
-            model_name='exercise',
-            name='created_at',
-        ),
-        migrations.RemoveField(
-            model_name='exercise',
-            name='updated_at',
-        ),
         migrations.AddField(
             model_name='exercise',
             name='user',
