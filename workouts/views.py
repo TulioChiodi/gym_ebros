@@ -4,9 +4,11 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.decorators import login_required
 from django.urls import reverse_lazy
 from django.contrib import messages
-from django.db import transaction
+from django.db import transaction, models
 from django.utils import timezone
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
+from django.db.models import Max, Avg, Count, F, ExpressionWrapper, FloatField, Q
+from django.db.models.functions import ExtractWeek, ExtractYear
 from .models import Exercise, Workout, WorkoutExercise, WorkoutSession, ExercisePerformance
 from .forms import (
     ExerciseForm, WorkoutForm, WorkoutExerciseFormSet,
@@ -15,6 +17,10 @@ from .forms import (
 from django.core.exceptions import ValidationError
 import logging
 import json
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from datetime import timedelta
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -59,51 +65,98 @@ class ExerciseListView(LoginRequiredMixin, ListView):
     model = Exercise
     template_name = 'workouts/exercise_list.html'
     context_object_name = 'exercises'
-    login_url = 'accounts:login'
 
     def get_queryset(self):
-        return Exercise.objects.filter(user=self.request.user)
+        try:
+            return Exercise.objects.filter(user=self.request.user)
+        except Exception as e:
+            logger.error(f"Error fetching exercises for user {self.request.user}: {str(e)}")
+            messages.error(self.request, "Error loading exercises. Please try again.")
+            return Exercise.objects.none()
 
 class ExerciseCreateView(LoginRequiredMixin, CreateView):
     model = Exercise
-    form_class = ExerciseForm
+    fields = ['name', 'description']
     template_name = 'workouts/exercise_form.html'
     success_url = reverse_lazy('workouts:exercise_list')
-    login_url = 'accounts:login'
 
     def form_valid(self, form):
-        form.instance.user = self.request.user
-        messages.success(self.request, 'Exercise created successfully!')
-        return super().form_valid(form)
+        try:
+            logger.info(f"Creating exercise with data: {form.cleaned_data}")
+            form.instance.user = self.request.user
+            response = super().form_valid(form)
+            messages.success(self.request, 'Exercise created successfully!')
+            return response
+        except Exception as e:
+            logger.error(f"Error creating exercise: {str(e)}", exc_info=True)
+            messages.error(self.request, f"Error creating exercise: {str(e)}")
+            return self.form_invalid(form)
+
+    def form_invalid(self, form):
+        logger.warning(f"Invalid exercise form submission: {form.errors}")
+        for field, errors in form.errors.items():
+            for error in errors:
+                messages.error(self.request, f"{field}: {error}")
+        return super().form_invalid(form)
 
 class ExerciseUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     model = Exercise
-    form_class = ExerciseForm
+    fields = ['name', 'description']
     template_name = 'workouts/exercise_form.html'
     success_url = reverse_lazy('workouts:exercise_list')
-    login_url = 'accounts:login'
 
     def test_func(self):
         exercise = self.get_object()
         return exercise.user == self.request.user
 
     def form_valid(self, form):
-        messages.success(self.request, 'Exercise updated successfully!')
-        return super().form_valid(form)
+        try:
+            logger.info(f"Updating exercise {self.object.id} with data: {form.cleaned_data}")
+            response = super().form_valid(form)
+            messages.success(self.request, 'Exercise updated successfully!')
+            return response
+        except Exception as e:
+            logger.error(f"Error updating exercise {self.object.id}: {str(e)}", exc_info=True)
+            messages.error(self.request, f"Error updating exercise: {str(e)}")
+            return self.form_invalid(form)
+
+    def form_invalid(self, form):
+        logger.warning(f"Invalid exercise update form submission: {form.errors}")
+        for field, errors in form.errors.items():
+            for error in errors:
+                messages.error(self.request, f"{field}: {error}")
+        return super().form_invalid(form)
+
+    def handle_no_permission(self):
+        logger.warning(f"Unauthorized access attempt to exercise {self.kwargs.get('pk')} by user {self.request.user}")
+        messages.error(self.request, "You don't have permission to edit this exercise.")
+        return redirect('workouts:exercise_list')
 
 class ExerciseDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     model = Exercise
     template_name = 'workouts/exercise_confirm_delete.html'
     success_url = reverse_lazy('workouts:exercise_list')
-    login_url = 'accounts:login'
 
     def test_func(self):
         exercise = self.get_object()
         return exercise.user == self.request.user
 
     def delete(self, request, *args, **kwargs):
-        messages.success(self.request, 'Exercise deleted successfully!')
-        return super().delete(request, *args, **kwargs)
+        try:
+            exercise = self.get_object()
+            logger.info(f"Deleting exercise {exercise.id}")
+            response = super().delete(request, *args, **kwargs)
+            messages.success(self.request, 'Exercise deleted successfully!')
+            return response
+        except Exception as e:
+            logger.error(f"Error deleting exercise {kwargs.get('pk')}: {str(e)}", exc_info=True)
+            messages.error(self.request, f"Error deleting exercise: {str(e)}")
+            return redirect('workouts:exercise_list')
+
+    def handle_no_permission(self):
+        logger.warning(f"Unauthorized delete attempt for exercise {self.kwargs.get('pk')} by user {self.request.user}")
+        messages.error(self.request, "You don't have permission to delete this exercise.")
+        return redirect('workouts:exercise_list')
 
 class WorkoutListView(LoginRequiredMixin, ListView):
     model = Workout
@@ -132,12 +185,14 @@ class WorkoutCreateView(LoginRequiredMixin, CreateView):
         data = super().get_context_data(**kwargs)
         if self.request.POST:
             data['exercises'] = WorkoutExerciseFormSet(self.request.POST)
+            logger.debug("POST request - using submitted data for formset")
         else:
             data['exercises'] = WorkoutExerciseFormSet()
             # Set initial order for empty forms
             for i, form in enumerate(data['exercises'].forms):
                 if not form.initial.get('order'):
                     form.initial['order'] = i + 1
+                    logger.debug(f"Setting initial order {i + 1} for form {i}")
         return data
 
     def form_valid(self, form):
@@ -158,22 +213,32 @@ class WorkoutCreateView(LoginRequiredMixin, CreateView):
             
         try:
             with transaction.atomic():
+                # First save the workout
                 form.instance.user = self.request.user
                 self.object = form.save()
+                logger.debug(f"Saved workout with ID: {self.object.id}")
                 
-                if exercises.is_valid():
-                    # Set order for forms after validation
-                    for i, form in enumerate(exercises.forms):
-                        if form.is_valid() and form.cleaned_data and not form.cleaned_data.get('DELETE'):
-                            form.instance.order = form.cleaned_data.get('order', i + 1)
+                # Get valid forms (not marked for deletion)
+                valid_forms = [f for f in exercises.forms if f.is_valid() and f.cleaned_data and not f.cleaned_data.get('DELETE')]
+                
+                if not valid_forms:
+                    raise ValidationError("Please add at least one exercise to the workout.")
+                
+                # Now save the exercises with proper workout relationship
+                for i, exercise_form in enumerate(valid_forms, start=1):
+                    exercise = exercise_form.save(commit=False)
+                    exercise.workout = self.object
+                    exercise.order = i
+                    exercise.save()
+                    logger.debug(f"Saved exercise {exercise.exercise.name} with order {i}")
+                
+                # Verify exercises were saved
+                saved_exercises = self.object.workoutexercise_set.count()
+                logger.info(f"Saved {saved_exercises} exercises for workout {self.object.id}")
+                
+                if saved_exercises == 0:
+                    raise ValidationError("No exercises were saved. Please try again.")
                     
-                    exercises.instance = self.object
-                    exercises.save()
-                    
-                    # Check if at least one exercise was added
-                    if not self.object.workoutexercise_set.exists():
-                        raise ValidationError("Please add at least one exercise to the workout.")
-                        
                 messages.success(self.request, 'Workout created successfully!')
                 return super().form_valid(form)
                 
@@ -385,23 +450,19 @@ def add_exercise_form(request):
         form_index = int(request.GET.get('form_index', 0))
         logger.debug(f"Adding exercise form with index: {form_index}")
         
+        # Create a new formset with one form
         formset = WorkoutExerciseFormSet()
         empty_form = formset.empty_form
         
-        # Log form generation details
-        logger.debug(f"Empty form prefix before update: {empty_form.prefix}")
-        
-        # Update form index in the prefix
+        # Update form index and prefix
         empty_form.prefix = empty_form.prefix.replace('__prefix__', str(form_index))
-        logger.debug(f"Empty form prefix after update: {empty_form.prefix}")
         
-        # Set initial values including order
+        # Set initial values
         empty_form.initial = {
-            'order': form_index + 1,  # Set order to form_index + 1
-            'suggested_sets': 3,  # Default values
+            'order': form_index + 1,
+            'suggested_sets': 3,
             'suggested_reps': 10
         }
-        logger.debug(f"Updated initial data: {empty_form.initial}")
         
         # Update widget attributes for each field
         for field_name, field in empty_form.fields.items():
@@ -426,8 +487,158 @@ def add_exercise_form(request):
             'exercise_form': empty_form,
             'form_index': form_index,
         }
+        
+        # Add JavaScript to update the management form's TOTAL_FORMS
+        context['update_total_forms'] = True
+        context['new_total'] = form_index + 1
+        
         return render(request, 'workouts/partials/exercise_form.html', context)
         
     except Exception as e:
         logger.exception("Error in add_exercise_form")
         return HttpResponse(f"Error adding exercise form: {str(e)}", status=500)
+
+@login_required
+def workout_analysis(request):
+    # Get user's workout data
+    performances = ExercisePerformance.objects.filter(
+        workout_session__user=request.user,
+        workout_session__finished_at__isnull=False
+    ).select_related('exercise', 'workout_session')
+    
+    if not performances.exists():
+        messages.info(request, "No completed workout sessions found. Complete some workouts to see your progress!")
+        return render(request, 'workouts/analysis.html')
+    
+    # Convert to DataFrame for easier analysis
+    df = pd.DataFrame(list(performances.values(
+        'exercise__name', 'reps', 'weight', 'performed_at',
+        'workout_session__started_at', 'workout_session__finished_at'
+    )))
+    
+    # 1. Weight Progression
+    weight_progress = {}
+    for exercise in df['exercise__name'].unique():
+        exercise_data = df[df['exercise__name'] == exercise]
+        fig = px.line(
+            exercise_data,
+            x='performed_at',
+            y='weight',
+            title=f'Weight Progression - {exercise}',
+            labels={'weight': 'Weight (kg)', 'performed_at': 'Date'}
+        )
+        weight_progress[exercise] = fig.to_html(full_html=False)
+    
+    # 2. Volume Progression (weight × reps)
+    df['volume'] = df['weight'] * df['reps']
+    volume_progress = {}
+    for exercise in df['exercise__name'].unique():
+        exercise_data = df[df['exercise__name'] == exercise]
+        daily_volume = exercise_data.groupby('performed_at')['volume'].sum().reset_index()
+        fig = px.line(
+            daily_volume,
+            x='performed_at',
+            y='volume',
+            title=f'Volume Progression - {exercise}',
+            labels={'volume': 'Volume (kg × reps)', 'performed_at': 'Date'}
+        )
+        volume_progress[exercise] = fig.to_html(full_html=False)
+    
+    # 3. Workout Frequency Analysis
+    sessions = WorkoutSession.objects.filter(
+        user=request.user,
+        finished_at__isnull=False
+    ).annotate(
+        week=ExtractWeek('started_at'),
+        year=ExtractYear('started_at')
+    ).values('week', 'year').annotate(
+        count=Count('id')
+    ).order_by('year', 'week')
+    
+    freq_data = pd.DataFrame(list(sessions))
+    if not freq_data.empty:
+        fig = px.bar(
+            freq_data,
+            x='week',
+            y='count',
+            title='Workouts per Week',
+            labels={'count': 'Number of Workouts', 'week': 'Week Number'}
+        )
+        workout_frequency = fig.to_html(full_html=False)
+    else:
+        workout_frequency = None
+    
+    # 4. Personal Records
+    prs = {}
+    for exercise in df['exercise__name'].unique():
+        exercise_data = df[df['exercise__name'] == exercise]
+        prs[exercise] = {
+            'max_weight': exercise_data['weight'].max(),
+            'max_volume': exercise_data['volume'].max(),
+            'max_reps': exercise_data['reps'].max(),
+            'total_volume': exercise_data['volume'].sum()
+        }
+    
+    # 5. Exercise Completion Rate
+    completion_data = WorkoutExercise.objects.filter(
+        workout__user=request.user
+    ).annotate(
+        completed_count=Count('workout__workoutsession__exerciseperformance',
+                            filter=models.Q(
+                                workout__workoutsession__exerciseperformance__exercise=F('exercise')
+                            ))
+    ).values('exercise__name').annotate(
+        completion_rate=ExpressionWrapper(
+            F('completed_count') * 100.0 / Count('workout__workoutsession'),
+            output_field=FloatField()
+        )
+    )
+    
+    completion_df = pd.DataFrame(list(completion_data))
+    if not completion_df.empty:
+        fig = px.bar(
+            completion_df,
+            x='exercise__name',
+            y='completion_rate',
+            title='Exercise Completion Rate',
+            labels={'completion_rate': 'Completion Rate (%)', 'exercise__name': 'Exercise'}
+        )
+        completion_chart = fig.to_html(full_html=False)
+    else:
+        completion_chart = None
+    
+    # 6. Rest Time Analysis
+    rest_times = []
+    for exercise in df['exercise__name'].unique():
+        exercise_data = df[df['exercise__name'] == exercise].sort_values('performed_at')
+        if len(exercise_data) > 1:
+            rest_time = exercise_data['performed_at'].diff().mean()
+            if pd.notnull(rest_time):
+                rest_times.append({
+                    'exercise': exercise,
+                    'avg_rest': rest_time.total_seconds() / 60  # Convert to minutes
+                })
+    
+    rest_df = pd.DataFrame(rest_times)
+    if not rest_df.empty:
+        fig = px.bar(
+            rest_df,
+            x='exercise',
+            y='avg_rest',
+            title='Average Rest Time Between Sets',
+            labels={'avg_rest': 'Rest Time (minutes)', 'exercise': 'Exercise'}
+        )
+        rest_chart = fig.to_html(full_html=False)
+    else:
+        rest_chart = None
+    
+    context = {
+        'weight_progress': weight_progress,
+        'volume_progress': volume_progress,
+        'workout_frequency': workout_frequency,
+        'personal_records': prs,
+        'completion_chart': completion_chart,
+        'rest_chart': rest_chart,
+    }
+    
+    return render(request, 'workouts/analysis.html', context)

@@ -4,13 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Gym Ebros{% endblock %}</title>
+    
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css" rel="stylesheet">
     <!-- HTMX -->
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    {% block extra_head %}{% endblock %}
+    <script src="https://unpkg.com/htmx.org@1.9.9"></script>
+    
+    <style>
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        main {
+            flex: 1;
+        }
+        .nav-link.active {
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -21,46 +35,36 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'workouts:exercise_list' %}">
-                            <i class="bi bi-list-check"></i> Exercises
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'workouts:workout_list' %}">
-                            <i class="bi bi-calendar-check"></i> Workouts
-                        </a>
-                    </li>
                     {% if user.is_authenticated %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'workouts:session_list' %}">
-                                <i class="bi bi-stopwatch"></i> Workout Sessions
-                            </a>
+                            <a class="nav-link {% if request.resolver_match.view_name == 'workouts:exercise_list' %}active{% endif %}" 
+                               href="{% url 'workouts:exercise_list' %}">Exercises</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.view_name == 'workouts:workout_list' %}active{% endif %}" 
+                               href="{% url 'workouts:workout_list' %}">Workouts</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.view_name == 'workouts:session_list' %}active{% endif %}" 
+                               href="{% url 'workouts:session_list' %}">Sessions</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.view_name == 'workouts:analysis' %}active{% endif %}" 
+                               href="{% url 'workouts:analysis' %}">Analysis</a>
                         </li>
                     {% endif %}
                 </ul>
                 <ul class="navbar-nav">
                     {% if user.is_authenticated %}
                         <li class="nav-item">
-                            <span class="nav-link">
-                                <i class="bi bi-person"></i> {{ user.username }}
-                            </span>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'accounts:logout' %}">
-                                <i class="bi bi-box-arrow-right"></i> Logout
-                            </a>
+                            <a class="nav-link" href="{% url 'accounts:logout' %}">Logout</a>
                         </li>
                     {% else %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'accounts:login' %}">
-                                <i class="bi bi-box-arrow-in-right"></i> Login
-                            </a>
+                            <a class="nav-link" href="{% url 'accounts:login' %}">Login</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'accounts:signup' %}">
-                                <i class="bi bi-person-plus"></i> Sign Up
-                            </a>
+                            <a class="nav-link" href="{% url 'accounts:signup' %}">Sign Up</a>
                         </li>
                     {% endif %}
                 </ul>
@@ -68,21 +72,30 @@
         </div>
     </nav>
 
-    {% if messages %}
-        <div class="container mt-3">
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }}">
-                    {{ message }}
-                </div>
-            {% endfor %}
+    <main class="py-4">
+        {% if messages %}
+            <div class="container">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="bg-dark text-light py-3 mt-auto">
+        <div class="container text-center">
+            <p class="mb-0">&copy; 2023 Gym Ebros. All rights reserved.</p>
         </div>
-    {% endif %}
+    </footer>
 
-    {% block content %}
-    {% endblock %}
-
-    <!-- Bootstrap JS -->
+    <!-- Bootstrap Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
     {% block extra_js %}{% endblock %}
 </body>
 </html>

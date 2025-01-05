@@ -95,10 +95,10 @@ class ExercisePerformanceForm(forms.ModelForm):
         workout_session = kwargs.pop('workout_session', None)
         super().__init__(*args, **kwargs)
         if workout_session:
-            # Only show exercises from the current workout
+            # Only show exercises from the current workout, ordered by their order in the workout
             self.fields['exercise'].queryset = Exercise.objects.filter(
                 workoutexercise__workout=workout_session.workout
-            )
+            ).distinct().order_by('workoutexercise__order')
         self.fields['notes'].required = False
 
 WorkoutExerciseFormSet = forms.inlineformset_factory(

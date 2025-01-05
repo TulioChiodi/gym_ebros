@@ -66,4 +66,11 @@
             </div>
         </div>
     </div>
-</div> 
+</div>
+
+{% if update_total_forms %}
+<script>
+    // Update the management form's TOTAL_FORMS count
+    document.getElementById('id_workoutexercise_set-TOTAL_FORMS').value = '{{ new_total }}';
+</script>
+{% endif %} 

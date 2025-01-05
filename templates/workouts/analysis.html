@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+
+{% block title %}Workout Analysis{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <h1 class="mb-4">Workout Analysis</h1>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if personal_records %}
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="h5 mb-0">Personal Records</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Exercise</th>
+                                        <th>Max Weight</th>
+                                        <th>Max Reps</th>
+                                        <th>Max Volume (Single Set)</th>
+                                        <th>Total Volume</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for exercise, stats in personal_records.items %}
+                                        <tr>
+                                            <td>{{ exercise }}</td>
+                                            <td>{{ stats.max_weight|floatformat:1 }} kg</td>
+                                            <td>{{ stats.max_reps }}</td>
+                                            <td>{{ stats.max_volume|floatformat:1 }} kg</td>
+                                            <td>{{ stats.total_volume|floatformat:1 }} kg</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Workout Frequency -->
+        {% if workout_frequency %}
+            <div class="row mb-5">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="h5 mb-0">Workout Frequency</h2>
+                        </div>
+                        <div class="card-body">
+                            {{ workout_frequency|safe }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Exercise Completion Rate -->
+        {% if completion_chart %}
+            <div class="row mb-5">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="h5 mb-0">Exercise Completion Rate</h2>
+                        </div>
+                        <div class="card-body">
+                            {{ completion_chart|safe }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Rest Time Analysis -->
+        {% if rest_chart %}
+            <div class="row mb-5">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="h5 mb-0">Rest Time Analysis</h2>
+                        </div>
+                        <div class="card-body">
+                            {{ rest_chart|safe }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Progress Charts -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="h5 mb-0">Progress Charts</h2>
+                    </div>
+                    <div class="card-body">
+                        <ul class="nav nav-tabs" id="progressTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="weight-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#weight" type="button" role="tab">
+                                    Weight Progress
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="volume-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#volume" type="button" role="tab">
+                                    Volume Progress
+                                </button>
+                            </li>
+                        </ul>
+                        <div class="tab-content pt-4" id="progressTabContent">
+                            <div class="tab-pane fade show active" id="weight" role="tabpanel">
+                                {% for exercise, chart in weight_progress.items %}
+                                    <div class="mb-4">
+                                        {{ chart|safe }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            <div class="tab-pane fade" id="volume" role="tabpanel">
+                                {% for exercise, chart in volume_progress.items %}
+                                    <div class="mb-4">
+                                        {{ chart|safe }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %} 

@@ -129,7 +129,7 @@
                                                     {% endif %}
                                                 </div>
                                             </div>
-                                            <div class="col-md-12">
+                                            <div class="col-md-4">
                                                 <div class="mb-3">
                                                     <label class="form-label">Notes</label>
                                                     {{ exercise_form.notes }}
@@ -161,10 +161,12 @@
                         <div class="mb-4">
                             <button type="button" 
                                    class="btn btn-outline-primary"
+                                   id="add-exercise-btn"
                                    hx-get="{% url 'workouts:add_exercise_form' %}"
                                    hx-target="#exercise-formset"
                                    hx-swap="beforeend"
-                                   hx-vals='{"form_index": "{{ exercises.forms|length }}"}'>
+                                   hx-trigger="click"
+                                   hx-vals='{"form_index": "0"}'>
                                 Add Another Exercise
                             </button>
                         </div>
@@ -185,4 +187,27 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let formCount = {{ exercises.total_form_count }};
+    const addButton = document.getElementById('add-exercise-btn');
+    const totalFormsInput = document.getElementById('id_workoutexercise_set-TOTAL_FORMS');
+
+    // Update form index before HTMX request
+    addButton.addEventListener('htmx:configRequest', function(event) {
+        event.detail.parameters.form_index = formCount;
+        formCount++;
+        totalFormsInput.value = formCount;
+    });
+
+    // Handle HTMX after swap to ensure proper form setup
+    document.body.addEventListener('htmx:afterSwap', function(event) {
+        if (event.detail.target.id === 'exercise-formset') {
+            // Ensure the management form is updated
+            totalFormsInput.value = formCount;
+        }
+    });
+});
+</script>
 {% endblock %} 

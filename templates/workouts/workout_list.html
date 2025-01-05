@@ -28,7 +28,7 @@
                                 <small class="text-muted">Created {{ workout.created_at|date }}</small>
                                 <div class="btn-group">
                                     <a href="{% url 'workouts:workout_detail' workout.pk %}" class="btn btn-sm btn-outline-secondary">View</a>
-                                    <a href="{% url 'workouts:workout_edit' workout.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                                    <a href="{% url 'workouts:workout_update' workout.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
                                     <a href="{% url 'workouts:workout_delete' workout.pk %}" class="btn btn-sm btn-outline-danger">Delete</a>
                                 </div>
                             </div>
