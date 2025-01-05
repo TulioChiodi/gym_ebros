@@ -18,6 +18,7 @@ from .forms import (
 from django.core.exceptions import ValidationError
 import logging
 import json
+from .analysis import workout_analysis
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -175,7 +176,20 @@ class WorkoutDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
 
     def test_func(self):
         workout = self.get_object()
-        return workout.user == self.request.user
+        # Allow access if user is the owner
+        if workout.user == self.request.user:
+            return True
+        # Allow access if user has accepted shared access
+        shared_workout = SharedWorkout.objects.filter(
+            workout=workout,
+            shared_with=self.request.user,
+            is_accepted=True
+        ).exists()
+        return shared_workout
+
+    def handle_no_permission(self):
+        messages.error(self.request, "You don't have permission to view this workout.")
+        return redirect('workouts:shared_workouts')
 
 class WorkoutCreateView(LoginRequiredMixin, CreateView):
     model = Workout
@@ -267,7 +281,21 @@ class WorkoutUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
 
     def test_func(self):
         workout = self.get_object()
-        return workout.user == self.request.user
+        # Allow access if user is the owner
+        if workout.user == self.request.user:
+            return True
+        # Allow access if user has accepted shared access with edit permission
+        shared_workout = SharedWorkout.objects.filter(
+            workout=workout,
+            shared_with=self.request.user,
+            is_accepted=True,
+            can_edit=True
+        ).exists()
+        return shared_workout
+
+    def handle_no_permission(self):
+        messages.error(self.request, "You don't have permission to edit this workout.")
+        return redirect('workouts:workout_detail', pk=self.get_object().pk)
 
     def get_context_data(self, **kwargs):
         data = super().get_context_data(**kwargs)
@@ -352,7 +380,7 @@ class WorkoutDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 @login_required(login_url='accounts:login')
 def index(request):
     return render(request, 'workouts/index.html', {
-        'total_exercises': Exercise.objects.count(),
+        'total_exercises': Exercise.objects.filter(user=request.user).count(),
         'total_workouts': Workout.objects.filter(user=request.user).count(),
     })
 
@@ -376,8 +404,11 @@ def start_workout_session(request):
             return redirect('workouts:session_detail', pk=session.pk)
     else:
         form = WorkoutSessionForm()
-        # Only show workouts created by the user
-        form.fields['workout'].queryset = Workout.objects.filter(user=request.user)
+        # Show both user's workouts and accepted shared workouts
+        form.fields['workout'].queryset = Workout.objects.filter(
+            Q(user=request.user) |  # User's own workouts
+            Q(sharedworkout__shared_with=request.user, sharedworkout__is_accepted=True)  # Shared workouts
+        ).distinct()
     
     return render(request, 'workouts/session_form.html', {'form': form})
 
@@ -501,151 +532,6 @@ def add_exercise_form(request):
         return HttpResponse(f"Error adding exercise form: {str(e)}", status=500)
 
 @login_required
-def workout_analysis(request):
-    # Get user's workout data
-    performances = ExercisePerformance.objects.filter(
-        workout_session__user=request.user,
-        workout_session__finished_at__isnull=False
-    ).select_related('exercise', 'workout_session')
-    
-    if not performances.exists():
-        messages.info(request, "No completed workout sessions found. Complete some workouts to see your progress!")
-        return render(request, 'workouts/analysis.html')
-    
-    # Convert to DataFrame for easier analysis
-    df = pd.DataFrame(list(performances.values(
-        'exercise__name', 'reps', 'weight', 'performed_at',
-        'workout_session__started_at', 'workout_session__finished_at'
-    )))
-    
-    # 1. Weight Progression
-    weight_progress = {}
-    for exercise in df['exercise__name'].unique():
-        exercise_data = df[df['exercise__name'] == exercise]
-        fig = px.line(
-            exercise_data,
-            x='performed_at',
-            y='weight',
-            title=f'Weight Progression - {exercise}',
-            labels={'weight': 'Weight (kg)', 'performed_at': 'Date'}
-        )
-        weight_progress[exercise] = fig.to_html(full_html=False)
-    
-    # 2. Volume Progression (weight × reps)
-    df['volume'] = df['weight'] * df['reps']
-    volume_progress = {}
-    for exercise in df['exercise__name'].unique():
-        exercise_data = df[df['exercise__name'] == exercise]
-        daily_volume = exercise_data.groupby('performed_at')['volume'].sum().reset_index()
-        fig = px.line(
-            daily_volume,
-            x='performed_at',
-            y='volume',
-            title=f'Volume Progression - {exercise}',
-            labels={'volume': 'Volume (kg × reps)', 'performed_at': 'Date'}
-        )
-        volume_progress[exercise] = fig.to_html(full_html=False)
-    
-    # 3. Workout Frequency Analysis
-    sessions = WorkoutSession.objects.filter(
-        user=request.user,
-        finished_at__isnull=False
-    ).annotate(
-        week=ExtractWeek('started_at'),
-        year=ExtractYear('started_at')
-    ).values('week', 'year').annotate(
-        count=Count('id')
-    ).order_by('year', 'week')
-    
-    freq_data = pd.DataFrame(list(sessions))
-    if not freq_data.empty:
-        fig = px.bar(
-            freq_data,
-            x='week',
-            y='count',
-            title='Workouts per Week',
-            labels={'count': 'Number of Workouts', 'week': 'Week Number'}
-        )
-        workout_frequency = fig.to_html(full_html=False)
-    else:
-        workout_frequency = None
-    
-    # 4. Personal Records
-    prs = {}
-    for exercise in df['exercise__name'].unique():
-        exercise_data = df[df['exercise__name'] == exercise]
-        prs[exercise] = {
-            'max_weight': exercise_data['weight'].max(),
-            'max_volume': exercise_data['volume'].max(),
-            'max_reps': exercise_data['reps'].max(),
-            'total_volume': exercise_data['volume'].sum()
-        }
-    
-    # 5. Exercise Completion Rate
-    completion_data = WorkoutExercise.objects.filter(
-        workout__user=request.user
-    ).annotate(
-        completed_count=Count('workout__workoutsession__exerciseperformance',
-                            filter=models.Q(
-                                workout__workoutsession__exerciseperformance__exercise=F('exercise')
-                            ))
-    ).values('exercise__name').annotate(
-        completion_rate=ExpressionWrapper(
-            F('completed_count') * 100.0 / Count('workout__workoutsession'),
-            output_field=FloatField()
-        )
-    )
-    
-    completion_df = pd.DataFrame(list(completion_data))
-    if not completion_df.empty:
-        fig = px.bar(
-            completion_df,
-            x='exercise__name',
-            y='completion_rate',
-            title='Exercise Completion Rate',
-            labels={'completion_rate': 'Completion Rate (%)', 'exercise__name': 'Exercise'}
-        )
-        completion_chart = fig.to_html(full_html=False)
-    else:
-        completion_chart = None
-    
-    # 6. Rest Time Analysis
-    rest_times = []
-    for exercise in df['exercise__name'].unique():
-        exercise_data = df[df['exercise__name'] == exercise].sort_values('performed_at')
-        if len(exercise_data) > 1:
-            rest_time = exercise_data['performed_at'].diff().mean()
-            if pd.notnull(rest_time):
-                rest_times.append({
-                    'exercise': exercise,
-                    'avg_rest': rest_time.total_seconds() / 60  # Convert to minutes
-                })
-    
-    rest_df = pd.DataFrame(rest_times)
-    if not rest_df.empty:
-        fig = px.bar(
-            rest_df,
-            x='exercise',
-            y='avg_rest',
-            title='Average Rest Time Between Sets',
-            labels={'avg_rest': 'Rest Time (minutes)', 'exercise': 'Exercise'}
-        )
-        rest_chart = fig.to_html(full_html=False)
-    else:
-        rest_chart = None
-    
-    context = {
-        'weight_progress': weight_progress,
-        'volume_progress': volume_progress,
-        'workout_frequency': workout_frequency,
-        'personal_records': prs,
-        'completion_chart': completion_chart,
-        'rest_chart': rest_chart,
-    }
-    
-    return render(request, 'workouts/analysis.html', context)
-
-@login_required
 def share_workout(request, pk):
     workout = get_object_or_404(Workout, pk=pk, user=request.user)
     
@@ -712,3 +598,127 @@ def decline_shared_workout(request, pk):
     shared_workout.delete()
     messages.success(request, f'You have declined the workout "{shared_workout.workout.name}"')
     return redirect('workouts:shared_workouts')
+
+@login_required
+def workout_specific_analysis(request, pk):
+    workout = get_object_or_404(Workout, pk=pk)
+    
+    # Check if user has access to this workout
+    if not (workout.user == request.user or SharedWorkout.objects.filter(
+        workout=workout, shared_with=request.user, is_accepted=True
+    ).exists()):
+        messages.error(request, "You don't have permission to view this workout's analysis.")
+        return redirect('workouts:workout_list')
+    
+    # Get all sessions for this workout
+    sessions = WorkoutSession.objects.filter(
+        workout=workout,
+        finished_at__isnull=False
+    ).select_related('user')
+    
+    if not sessions.exists():
+        messages.info(request, "No completed sessions found for this workout yet.")
+        return redirect('workouts:workout_detail', pk=workout.pk)
+    
+    # Overall Statistics
+    total_sessions = sessions.count()
+    unique_users = sessions.values('user').distinct().count()
+    completion_rate = (sessions.filter(finished_at__isnull=False).count() / 
+                      WorkoutSession.objects.filter(workout=workout).count() * 100)
+    
+    # Calculate average duration and format it
+    avg_duration = sessions.exclude(
+        finished_at__isnull=True
+    ).annotate(
+        duration=ExpressionWrapper(
+            F('finished_at') - F('started_at'),
+            output_field=models.DurationField()
+        )
+    ).aggregate(avg=Avg('duration'))['avg']
+    
+    if avg_duration:
+        hours = avg_duration.total_seconds() // 3600
+        minutes = (avg_duration.total_seconds() % 3600) // 60
+        avg_duration = f"{int(hours)}h {int(minutes)}m"
+    
+    # Exercise Performance Analysis
+    exercise_stats = {}
+    for exercise in workout.workoutexercise_set.all():
+        performances = ExercisePerformance.objects.filter(
+            workout_session__workout=workout,
+            exercise=exercise.exercise,
+            workout_session__finished_at__isnull=False
+        ).order_by('workout_session__started_at')
+        
+        if performances.exists():
+            # Weight progression
+            weight_data = performances.values(
+                'workout_session__started_at'
+            ).annotate(
+                avg_weight=Avg('weight')
+            ).order_by('workout_session__started_at')
+            
+            # Create weight progression chart with adjusted size and layout
+            fig = px.line(
+                x=[d['workout_session__started_at'] for d in weight_data],
+                y=[d['avg_weight'] for d in weight_data],
+                title=f'Weight Progression - {exercise.exercise.name}',
+                labels={'x': 'Date', 'y': 'Average Weight (kg)'}
+            )
+            
+            # Update layout for better readability
+            fig.update_layout(
+                height=400,
+                margin=dict(l=50, r=30, t=50, b=50),
+                title_x=0.5,
+                title_y=0.95,
+                title=dict(font=dict(size=16)),
+                xaxis=dict(title_font=dict(size=12)),
+                yaxis=dict(title_font=dict(size=12))
+            )
+            
+            # Calculate statistics
+            stats = performances.aggregate(
+                avg_weight=Avg('weight'),
+                max_weight=Max('weight'),
+                avg_reps=Avg('reps'),
+                max_reps=Max('reps'),
+                total_sets=Count('id')
+            )
+            
+            # Calculate percentiles
+            weight_values = list(performances.values_list('weight', flat=True))
+            if weight_values:
+                weight_values.sort()
+                n = len(weight_values)
+                stats['percentile_25'] = weight_values[int(n * 0.25)]
+                stats['percentile_50'] = weight_values[int(n * 0.50)]
+                stats['percentile_75'] = weight_values[int(n * 0.75)]
+            else:
+                stats['percentile_25'] = 0
+                stats['percentile_50'] = 0
+                stats['percentile_75'] = 0
+            
+            # Add to exercise stats
+            exercise_stats[exercise.exercise.name] = {
+                'chart': fig.to_html(full_html=False, config={'displayModeBar': False}),
+                'stats': stats,
+                'percentiles': {
+                    'weight': {
+                        '25th': stats['percentile_25'],
+                        '50th': stats['percentile_50'],
+                        '75th': stats['percentile_75']
+                    }
+                }
+            }
+    
+    context = {
+        'workout': workout,
+        'total_sessions': total_sessions,
+        'unique_users': unique_users,
+        'completion_rate': completion_rate,
+        'avg_duration': avg_duration,
+        'exercise_stats': exercise_stats,
+    }
+    
+    return render(request, 'workouts/workout_analysis.html', context)

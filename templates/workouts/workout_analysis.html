@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+
+{% block title %}Analysis - {{ workout.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h1 class="card-title">{{ workout.name }} - Analysis</h1>
+                    <p class="text-muted">{{ workout.description }}</p>
+                    
+                    <!-- Overall Statistics -->
+                    <div class="row mt-4">
+                        <div class="col-md-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h3 class="h4">{{ total_sessions }}</h3>
+                                    <p class="text-muted small mb-0">Total Sessions</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h3 class="h4">{{ unique_users }}</h3>
+                                    <p class="text-muted small mb-0">Active Users</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h3 class="h4">{{ completion_rate|floatformat:0 }}%</h3>
+                                    <p class="text-muted small mb-0">Completion Rate</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h3 class="h4">{{ avg_duration|default:"N/A"|truncatechars:8 }}</h3>
+                                    <p class="text-muted small mb-0">Avg Duration</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Exercise Analysis -->
+            {% for exercise_name, data in exercise_stats.items %}
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h2 class="h5 mb-0">{{ exercise_name }}</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <!-- Weight Progression Chart -->
+                            <div class="col-lg-8">
+                                <div style="height: 400px;">
+                                    {{ data.chart|safe }}
+                                </div>
+                            </div>
+                            
+                            <!-- Exercise Statistics -->
+                            <div class="col-lg-4">
+                                <h3 class="h6">Statistics</h3>
+                                <ul class="list-unstyled">
+                                    <li><strong>Average Weight:</strong> {{ data.stats.avg_weight|floatformat:1 }} kg</li>
+                                    <li><strong>Max Weight:</strong> {{ data.stats.max_weight|floatformat:1 }} kg</li>
+                                    <li><strong>Average Reps:</strong> {{ data.stats.avg_reps|floatformat:1 }}</li>
+                                    <li><strong>Max Reps:</strong> {{ data.stats.max_reps }}</li>
+                                    <li><strong>Total Sets:</strong> {{ data.stats.total_sets }}</li>
+                                </ul>
+                                
+                                <h3 class="h6 mt-4">Weight Percentiles</h3>
+                                <ul class="list-unstyled">
+                                    <li><strong>25th:</strong> {{ data.percentiles.weight.25th|floatformat:1 }} kg</li>
+                                    <li><strong>50th (Median):</strong> {{ data.percentiles.weight.50th|floatformat:1 }} kg</li>
+                                    <li><strong>75th:</strong> {{ data.percentiles.weight.75th|floatformat:1 }} kg</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+            
+            <div class="mt-4">
+                <a href="{% url 'workouts:workout_detail' workout.pk %}" class="btn btn-secondary">Back to Workout</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
