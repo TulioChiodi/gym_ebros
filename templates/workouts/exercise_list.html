@@ -23,7 +23,7 @@
                             <div class="d-flex justify-content-between align-items-center">
                                 <small class="text-muted">Added {{ exercise.created_at|date }}</small>
                                 <div class="btn-group">
-                                    <a href="{% url 'workouts:exercise_update' exercise.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                                    <a href="{% url 'workouts:exercise_edit' exercise.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
                                     <a href="{% url 'workouts:exercise_delete' exercise.pk %}" class="btn btn-sm btn-outline-danger">Delete</a>
                                 </div>
                             </div>

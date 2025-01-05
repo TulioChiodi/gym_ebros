@@ -80,11 +80,21 @@ class WorkoutExerciseForm(forms.ModelForm):
 class WorkoutSessionForm(forms.ModelForm):
     class Meta:
         model = WorkoutSession
-        fields = ['workout', 'notes']
+        fields = ['workout']
         widgets = {
-            'workout': forms.Select(attrs={'class': 'form-control'}),
-            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': '2'}),
+            'workout': forms.Select(attrs={'class': 'form-select'})
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'workout' in self.fields:
+            self.fields['workout'].label_from_instance = self.workout_label_from_instance
+
+    @staticmethod
+    def workout_label_from_instance(obj):
+        if hasattr(obj, 'sharedworkout_set') and obj.sharedworkout_set.exists():
+            return f"{obj.name} (Shared by {obj.user.username})"
+        return obj.name
 
 class ExercisePerformanceForm(forms.ModelForm):
     class Meta:

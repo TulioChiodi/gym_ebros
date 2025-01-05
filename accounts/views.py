@@ -1,13 +1,13 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, authenticate, logout
-from django.contrib.auth.forms import UserCreationForm
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, View
 from django.contrib.auth.views import LoginView, LogoutView
 from django.contrib import messages
+from .forms import CustomUserCreationForm
 
 class SignUpView(CreateView):
-    form_class = UserCreationForm
+    form_class = CustomUserCreationForm
     template_name = 'accounts/signup.html'
     
     def get_success_url(self):

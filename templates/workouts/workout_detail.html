@@ -11,11 +11,22 @@
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <h1 class="card-title mb-0">{{ workout.name }}</h1>
                         <div class="btn-group">
-                            <a href="{% url 'workouts:workout_update' workout.pk %}" class="btn btn-primary">Edit Workout</a>
-                            <a href="{% url 'workouts:share_workout' workout.pk %}" class="btn btn-info">
-                                <i class="bi bi-share"></i> Share
+                            <a href="{% url 'workouts:workout_analysis' workout.pk %}" class="btn btn-info">
+                                <i class="bi bi-graph-up"></i> Analysis
                             </a>
-                            <a href="{% url 'workouts:workout_delete' workout.pk %}" class="btn btn-danger">Delete</a>
+                            {% if workout.user == request.user %}
+                                <a href="{% url 'workouts:workout_edit' workout.pk %}" class="btn btn-primary">Edit Workout</a>
+                                <a href="{% url 'workouts:share_workout' workout.pk %}" class="btn btn-info">
+                                    <i class="bi bi-share"></i> Share
+                                </a>
+                                <a href="{% url 'workouts:workout_delete' workout.pk %}" class="btn btn-danger">Delete</a>
+                            {% else %}
+                                {% for shared in workout.sharedworkout_set.all %}
+                                    {% if shared.shared_with == request.user and shared.can_edit %}
+                                        <a href="{% url 'workouts:workout_edit' workout.pk %}" class="btn btn-primary">Edit Workout</a>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
                         </div>
                     </div>
 
@@ -52,13 +63,20 @@
                     {% endif %}
 
                     <div class="mt-4">
-                        <a href="{% url 'workouts:workout_list' %}" class="btn btn-secondary">Back to Workouts</a>
+                        {% if workout.user == request.user %}
+                            <a href="{% url 'workouts:workout_list' %}" class="btn btn-secondary">Back to Workouts</a>
+                        {% else %}
+                            <a href="{% url 'workouts:shared_workouts' %}" class="btn btn-secondary">Back to Shared Workouts</a>
+                        {% endif %}
                     </div>
                 </div>
                 <div class="card-footer text-muted">
                     Created: {{ workout.created_at|date }}
                     {% if workout.updated_at != workout.created_at %}
                         | Last modified: {{ workout.updated_at|date }}
+                    {% endif %}
+                    {% if workout.user != request.user %}
+                        | Shared by: {{ workout.user.username }}
                     {% endif %}
                 </div>
             </div>
