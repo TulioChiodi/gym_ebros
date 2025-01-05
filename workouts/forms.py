@@ -5,12 +5,7 @@ from django.db import models
 class ExerciseForm(forms.ModelForm):
     class Meta:
         model = Exercise
-        fields = ['name', 'description', 'target_muscle']
-        widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'target_muscle': forms.TextInput(attrs={'class': 'form-control'}),
-        }
+        fields = ['name', 'description']
 
 class WorkoutForm(forms.ModelForm):
     class Meta:

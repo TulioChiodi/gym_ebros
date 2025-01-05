@@ -2,13 +2,11 @@
 # exit on error
 set -o errexit
 
-# Install Python dependencies
-python -m pip install --upgrade pip
+# Install dependencies
 pip install -r requirements.txt
 
-# Create staticfiles directory if it doesn't exist
-mkdir -p staticfiles
-
-# Run Django commands
+# Collect static files
 python manage.py collectstatic --no-input
+
+# Run migrations
 python manage.py migrate 

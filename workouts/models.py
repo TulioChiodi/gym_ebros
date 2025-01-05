@@ -4,9 +4,7 @@ from django.contrib.auth.models import User
 class Exercise(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
-    target_muscle = models.CharField(max_length=50)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
 
     def __str__(self):
         return self.name

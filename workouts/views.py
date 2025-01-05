@@ -61,6 +61,9 @@ class ExerciseListView(LoginRequiredMixin, ListView):
     context_object_name = 'exercises'
     login_url = 'accounts:login'
 
+    def get_queryset(self):
+        return Exercise.objects.filter(user=self.request.user)
+
 class ExerciseCreateView(LoginRequiredMixin, CreateView):
     model = Exercise
     form_class = ExerciseForm
@@ -69,25 +72,34 @@ class ExerciseCreateView(LoginRequiredMixin, CreateView):
     login_url = 'accounts:login'
 
     def form_valid(self, form):
+        form.instance.user = self.request.user
         messages.success(self.request, 'Exercise created successfully!')
         return super().form_valid(form)
 
-class ExerciseUpdateView(LoginRequiredMixin, UpdateView):
+class ExerciseUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     model = Exercise
     form_class = ExerciseForm
     template_name = 'workouts/exercise_form.html'
     success_url = reverse_lazy('workouts:exercise_list')
     login_url = 'accounts:login'
 
+    def test_func(self):
+        exercise = self.get_object()
+        return exercise.user == self.request.user
+
     def form_valid(self, form):
         messages.success(self.request, 'Exercise updated successfully!')
         return super().form_valid(form)
 
-class ExerciseDeleteView(LoginRequiredMixin, DeleteView):
+class ExerciseDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     model = Exercise
     template_name = 'workouts/exercise_confirm_delete.html'
     success_url = reverse_lazy('workouts:exercise_list')
     login_url = 'accounts:login'
+
+    def test_func(self):
+        exercise = self.get_object()
+        return exercise.user == self.request.user
 
     def delete(self, request, *args, **kwargs):
         messages.success(self.request, 'Exercise deleted successfully!')
