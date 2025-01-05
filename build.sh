@@ -8,13 +8,16 @@ pip install -r requirements.txt
 # Collect static files
 python manage.py collectstatic --no-input
 
-# Drop and recreate the database tables
-python manage.py dbshell << EOF
+# Only reset database if RESET_DATABASE is set to "true"
+if [ "$RESET_DATABASE" = "true" ]; then
+    echo "Resetting database..."
+    python manage.py dbshell << EOF
 DROP SCHEMA public CASCADE;
 CREATE SCHEMA public;
 GRANT ALL ON SCHEMA public TO postgres;
 GRANT ALL ON SCHEMA public TO public;
 EOF
+fi
 
 # Apply migrations
 python manage.py migrate 
